@@ -113,7 +113,9 @@ const MOCK = {
     { t:'本月總諮詢量', v:'1,284 則', d:'較上月 +18%', up:true },
     { t:'AI 自動解決率', v:'84.2%', d:'較上月 +4.1%', up:true },
     { t:'行政正確分流率', v:'93.5%', d:'較上月 +2.7%', up:true },
+    { t:'人工轉介率', v:'15.8%', d:'較上月 -4.1%', up:true },
     { t:'平均回覆時間', v:'1.4 秒', d:'較上月 -0.6 秒', up:true },
+    { t:'使用者滿意度', v:'94.6%', d:'較上月 +3.2%', up:true, isSat:true },
   ],
   routing:[ ['招生組',32,'#2E3A87'],['住宿服務組',18,'#4f6bed'],['生活輔導組',14,'#8aa0ff'],['註冊組',13,'#0f9d8a'],['國際事務處',9,'#f2a93b'],['各系所',14,'#b66dd6'] ],
   trend:{ days:['11/20','11/21','11/22','11/23','11/24','11/25','11/26'], total:[142,168,121,98,203,236,316], ai:[118,141,102,81,171,198,265] },
@@ -145,7 +147,7 @@ function RouteCard({r}){ return html`
       <div class="flex items-center gap-1.5 truncate"><span>✉️</span><b class="text-slate-900 font-medium truncate">${r.mail}</b></div>
       <div class="flex items-center gap-1.5"><span>📍</span><b class="text-slate-900 font-medium">${r.loc}</b></div>
     </div>
-    <a href=${r.url} onClick=${e=>e.preventDefault()} class="inline-flex items-center gap-1.5 mt-4 text-xs font-medium px-3.5 py-2 rounded-xl btn-primary">前往官方網頁 ↗</a>
+    <a href=${r.url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 mt-4 text-xs font-medium px-3.5 py-2 rounded-xl btn-primary">前往官方網頁 ↗</a>
   </div>`; }
 
 function ReferralForm({dept,onSubmit}){
@@ -164,11 +166,12 @@ function ReferralForm({dept,onSubmit}){
       onClick=${()=>{ onSubmit({who:f.name.trim()||'訪客 #9F3C',sum:f.desc||'特殊選才跨系雙主修與學分抵免規定',dept}); setDone(true); }}>送出轉介單</button>
   </div>`; }
 
-function BotMsg({sc,onSubmit,tick}){
-  const [step,setStep]=useState(0); const [n,setN]=useState(-1);
+function BotMsg({sc,onSubmit,onRate,tick}){
+  const [step,setStep]=useState(0); const [n,setN]=useState(-1); const [fb,setFb]=useState(null);
   useEffect(()=>{ const t1=setTimeout(()=>setStep(1),400), t2=setTimeout(()=>setStep(2),800), t3=setTimeout(()=>setN(0),1200); return()=>{clearTimeout(t1);clearTimeout(t2);clearTimeout(t3)}; },[]);
   useEffect(()=>{ if(n<0) return; if(n>=sc.text.length){tick();return;} const t=setTimeout(()=>{setN(n+2);tick()},22); return()=>clearTimeout(t); },[n]);
   const done=n>=sc.text.length;
+  const rate=v=>{ if(fb!==null) return; setFb(v); onRate&&onRate(v); };
   if(n<0) return html`<div class="card px-4 py-3 text-sm sub inline-flex items-center gap-2.5 pop"><span class="w-2 h-2 rounded-full bg-[#1E3A8A] animate-pulse"></span><span>${MOCK.steps[step]}</span></div>`;
   return html`<div class="max-w-[90%] sm:max-w-[82%]">
     <div class="flex flex-wrap gap-2 mb-2 text-xs">
@@ -177,13 +180,20 @@ function BotMsg({sc,onSubmit,tick}){
     </div>
     <div class=${'card px-5 py-4 text-[15px] leading-relaxed text-slate-800 '+(done?'':'cursor')}>${sc.text.slice(0,n)}</div>
     ${done&&html`<div class="pop">
-      <span class="inline-flex items-center gap-1.5 mt-2.5 text-xs px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80 sub cursor-pointer hover:bg-slate-100 transition-colors">📄 資料來源：${sc.source}</span>
+      <div class="flex flex-wrap items-center justify-between gap-2 mt-2.5">
+        <span class="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80 sub">📄 資料來源：${sc.source}</span>
+        ${fb===null
+          ?html`<div class="inline-flex items-center gap-1.5 text-xs sub"><span>有幫助嗎？</span>
+            <button onClick=${()=>rate(true)} class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">👍 有幫助</button>
+            <button onClick=${()=>rate(false)} class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 transition-colors">👎 需改進</button></div>`
+          :html`<span class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200/70">✓ 已收到您的滿意度回饋</span>`}
+      </div>
       ${sc.route&&html`<${RouteCard} r=${sc.route}/>`}
       ${sc.referral&&html`<${ReferralForm} dept=${sc.referral.dept} onSubmit=${onSubmit}/>`}
     </div>`}
   </div>`; }
 
-function Chat({onTicket}){
+function Chat({onTicket,onRate}){
   const [msgs,setMsgs]=useState([]); const [q,setQ]=useState(''); const end=useRef(null);
   const tick=()=>end.current&&end.current.scrollIntoView({block:'end'});
   const send=t=>{ t=t.trim(); if(!t) return; const sc=match(t); setMsgs(m=>[...m,{r:'u',t,id:Date.now()},{r:'b',sc,id:Date.now()+1}]); setQ(''); setTimeout(tick,50); };
@@ -195,7 +205,7 @@ function Chat({onTicket}){
         <p class="sub text-[15px] leading-relaxed mt-2.5">中央大學智慧招生諮詢助理——自動回答招生問題，並將行政業務分流至正確處室。</p></div>`}
       ${msgs.map(m=>m.r==='u'
         ?html`<div key=${m.id} class="flex justify-end pop"><div class="text-white px-4.5 py-3 rounded-2xl rounded-br-md max-w-[78%] text-[15px] leading-relaxed shadow-sm" style=${{background:BRAND}}>${m.t}</div></div>`
-        :html`<div key=${m.id} class="flex"><${BotMsg} sc=${m.sc} onSubmit=${onTicket} tick=${tick}/></div>`)}
+        :html`<div key=${m.id} class="flex"><${BotMsg} sc=${m.sc} onSubmit=${onTicket} onRate=${onRate} tick=${tick}/></div>`)}
       <div ref=${end}></div>
     </div>
     <div class="pb-5 pt-2">
@@ -263,9 +273,9 @@ function StaffLogin({onLogin,onBack}){
       <button onClick=${onBack} class="w-full mt-4 text-xs sub hover:text-slate-900 transition-colors">← 返回考生智慧諮詢（前台）</button>
     </div></div>`; }
 
-function Dashboard({tickets,staff,onLogout,onExport}){
+function Dashboard({tickets,staff,satPct,onLogout,onExport}){
   const sc={'已通知承辦人':'bg-slate-100 text-slate-700 border-slate-200','處理中':'bg-amber-50 text-amber-700 border-amber-200/80','已結案':'bg-emerald-50 text-emerald-700 border-emerald-200/80'};
-  const kpi=MOCK.kpi;
+  const kpi=MOCK.kpi.map(k=>k.isSat?{...k,v:satPct+'%'}:k);
   return html`<div class="h-full scroll"><div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div><h2 class="text-xl font-bold tracking-tight text-slate-900">行政數據儀表板</h2><div class="text-xs sub mt-0.5">Powered by Microsoft Power BI 概念展示 · 資料更新：2026/11/26</div></div>
@@ -278,7 +288,7 @@ function Dashboard({tickets,staff,onLogout,onExport}){
         <button onClick=${onExport} class="text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-2 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-xs">⬇ 匯出報表 (CSV)</button>
         <button onClick=${onLogout} class="text-sm font-medium text-slate-600 bg-slate-100 border border-slate-200/80 rounded-xl px-3.5 py-2 hover:bg-slate-200/70 hover:text-slate-900 transition-all">登出</button>
       </div></div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">${kpi.map(k=>html`<div key=${k.t} class="card p-5"><div class="text-xs font-medium uppercase tracking-wider sub">${k.t}</div><div class="text-3xl font-bold tracking-tight text-slate-900 mt-2 tabular-nums">${k.v}</div><div class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full mt-2.5">▲ ${k.d}</div></div>`)}</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">${kpi.map(k=>html`<div key=${k.t} class="card p-5"><div class="text-xs font-medium uppercase tracking-wider sub">${k.t}</div><div class="text-3xl font-bold tracking-tight text-slate-900 mt-2 tabular-nums">${k.v}</div><div class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full mt-2.5">▲ ${k.d}</div></div>`)}</div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="card p-6"><div class="font-semibold text-[15px] text-slate-900 mb-4">各行政處室分流佔比</div><${Donut}/></div>
       <div class="card p-6"><div class="font-semibold text-[15px] text-slate-900 mb-4">近 7 日諮詢量 vs. AI 自動解決</div><${Trend}/></div></div>
@@ -291,18 +301,35 @@ function Dashboard({tickets,staff,onLogout,onExport}){
 
 function App(){
   const [view,setView]=useState('chat'); const [tickets,setTickets]=useState(MOCK.tickets); const [toast,setToast]=useState(null); const [staff,setStaff]=useState(null);
+  const [rating,setRating]=useState({up:175,total:185});
+  const satPct=((rating.up/rating.total)*100).toFixed(1);
   const show=m=>{setToast(m);setTimeout(()=>setToast(null),4500)};
-  const addTicket=({who,sum,dept})=>{ const id='NCU-2026-089'; setTickets(t=>[{id,who,sum,dept,status:'已通知承辦人',time:'11/26 剛剛',isNew:true},...t.filter(x=>x.id!==id)]);
-    show(`⚡ 已透過 Microsoft Power Automate 建立工單 #${id}，並自動發送 Teams/Email 通知予承辦人員`); };
+  const addTicket=({who,sum,dept})=>{
+    const nextNum=85+tickets.length;
+    const id='NCU-2026-'+String(nextNum).padStart(3,'0');
+    setTickets(t=>[{id,who,sum,dept,status:'已通知承辦人',time:'11/26 剛剛',isNew:true},...t]);
+    show(`⚡ 已透過 Microsoft Power Automate 建立工單 #${id}，並自動發送 Teams/Email 通知予承辦人員`);
+  };
+  const onRate=ok=>{
+    setRating(r=>({up:r.up+(ok?1:0),total:r.total+1}));
+    show(ok?'👍 感謝回饋！此回答已計入系統滿意度統計':'📝 已記錄您的回饋，您也可透過下方表單轉介專人協助');
+  };
+  const exportCSV=()=>{
+    const rows=[['工單編號','訪客代碼','問題摘要','指派處室','處理狀態','建立時間'],...tickets.map(t=>[t.id,t.who,t.sum,t.dept,t.status,t.time])];
+    const csv='\uFEFF'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+    a.download='ncu-admission-report-2026-11.csv'; a.click();
+    show('✅ 報表匯出成功：ncu-admission-report-2026-11.csv');
+  };
   const tab=(v,l)=>html`<button onClick=${()=>setView(v)} class=${'px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition-all '+(view===v?'bg-white font-semibold shadow-sm':'text-slate-600 hover:text-slate-900')} style=${view===v?{color:BRAND}:{}}>${l}</button>`;
   return html`<div class="h-full flex flex-col">
     <header class="sticky top-0 z-30 nav-glass flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 shrink-0">
       <div class="flex items-center gap-3"><img src="./logo.jpg" alt="NCU Admission Copilot Logo" class="w-9 h-9 rounded-full object-cover shrink-0"/><div><div class="font-bold text-[15px] tracking-tight text-slate-900 leading-tight">NCU Admission Copilot</div><div class="text-[11px] sub hidden md:block">中央大學智慧招生諮詢與行政分流系統</div></div></div>
       <div class="flex gap-1 bg-slate-100/90 border border-slate-200/80 p-1 rounded-xl">${tab('chat','考生智慧諮詢（前台）')}${tab('dash',(staff?'':'🔒 ')+'行政數據儀表板（Power BI 視角）')}</div></header>
     <main class="flex-1 min-h-0">${view==='chat'
-      ?html`<${Chat} onTicket=${addTicket}/>`
+      ?html`<${Chat} onTicket=${addTicket} onRate=${onRate}/>`
       :(staff
-        ?html`<${Dashboard} tickets=${tickets} staff=${staff} onLogout=${()=>{setStaff(null);setView('chat');show('已登出工作人員帳號')}} onExport=${()=>show('✅ 報表匯出成功：ncu-admission-report-2026-11.csv')}/>`
+        ?html`<${Dashboard} tickets=${tickets} staff=${staff} satPct=${satPct} onLogout=${()=>{setStaff(null);setView('chat');show('已登出工作人員帳號')}} onExport=${exportCSV}/>`
         :html`<${StaffLogin} onLogin=${u=>{setStaff(u);show('🔓 歡迎登入：'+u.name+'（'+u.dept+'）')}} onBack=${()=>setView('chat')}/>`)}</main>
     ${toast&&html`<div class="fixed top-16 right-6 max-w-sm card p-4 text-sm text-slate-800 pop z-50 border-l-[3px] shadow-lg" style=${{borderLeftColor:'#059669'}}>${toast}</div>`}
   </div>`; }
